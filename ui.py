@@ -1,5 +1,3 @@
-#Si haceis run en ui.py os muestra UI. Asegurate de pulsar limpiar cuando cambias sudoku o despues de perder. :)
-#Quereis que lo personalize mas?
 import tkinter as tk
 from tkinter import ttk, messagebox
 import time
@@ -65,7 +63,6 @@ class SudokuUI:
             for j in range(9): #Recorre fila y columa para crear celda
                 e = tk.Entry(grid, width=3, font=('Arial', 18), justify="center") #Crear
                 e.grid(row=i, column=j, padx=1, pady=1) #Posicionar
-                e.bind('<KeyRelease>', lambda ev, r=i, c=j: self.change(r, c)) #Cuando se edita, llama a self.change para actualizar su estado
                 row_cells.append(e) #Guarda la referencia a la celda para acceder luego
             self.cells.append(row_cells) #Guarda la fila en self.cells
     
@@ -143,15 +140,15 @@ class SudokuUI:
                 elapsed_time = time.time() - self.start_time
                 # Record the attempt in stats
                 self.stats_manager.append_attempt({
-                    'timestamp': time.time(),
-                    'time': elapsed_time,
-                    'steps': step.steps_count,
-                    'backtracks': step.backtracks_count,
-                    'algorithm': self.mode.get()
+                    "timestamp": time.time(),
+                    "time": elapsed_time,
+                    "steps": step.steps_count,
+                    "backtracks": step.backtracks_count,
+                    "algorithm": self.mode.get()
                 })
                 messagebox.showinfo("Sudoku resuelto!", 
-                                    f"Steps: {step.steps_count}\n"
-                                    f"Backtracks: {step.backtracks_count}\n"
+                                    f"Steps: {step.steps_count}"
+                                    f"Backtracks: {step.backtracks_count}"
                                     f"Time: {elapsed_time:.2f}s")
                 return
             #Codigo que nunca va pasar
