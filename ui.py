@@ -5,6 +5,7 @@ from tkinter import ttk, messagebox
 import time
 from solver import solve_step_by_step
 from examples import EXAMPLES
+from stats import StatsManager
 
 class SudokuUI:
     def __init__(self, root):
@@ -17,6 +18,7 @@ class SudokuUI:
         self.generator = None
         self.running = False
         self.start_time = None
+        self.stats_manager = StatsManager()
         
         #UI
         control = ttk.Frame(root, padding="10")
@@ -36,6 +38,7 @@ class SudokuUI:
         #Botones de control
         ttk.Button(control, text="Solve", command=self.solve).pack(side=tk.LEFT, padx=5)
         ttk.Button(control, text="Stop", command=lambda: setattr(self, "running", False)).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control, text="Stats", command=self.show_stats).pack(side=tk.LEFT, padx=5)
         
         #Muestra las estadisticas
         stats = ttk.Frame(root, padding="10")
@@ -137,11 +140,19 @@ class SudokuUI:
                 self.cells[step.row][step.col].delete(0, tk.END)
             elif step.action == "done":
                 self.running = False
-                messagebox.showinfo("Sudoku resuelto!"
-                                    f"Steps: {step.steps_count}"
-                                    f"Backtracks: {step.backtracks_count}"
-                                    f"Time: {time.time() - self.start_time:.2f}s"
-                                    )
+                elapsed_time = time.time() - self.start_time
+                # Record the attempt in stats
+                self.stats_manager.append_attempt({
+                    'timestamp': time.time(),
+                    'time': elapsed_time,
+                    'steps': step.steps_count,
+                    'backtracks': step.backtracks_count,
+                    'algorithm': self.mode.get()
+                })
+                messagebox.showinfo("Sudoku resuelto!", 
+                                    f"Steps: {step.steps_count}\n"
+                                    f"Backtracks: {step.backtracks_count}\n"
+                                    f"Time: {elapsed_time:.2f}s")
                 return
             #Codigo que nunca va pasar
             elif step.action == "fail":
@@ -152,6 +163,9 @@ class SudokuUI:
             self.root.after(20, self.next_step)
         except StopIteration:
             self.running = False
+
+    def show_stats(self):
+        self.stats_manager.show_graphs()
 
 root = tk.Tk()
 app = SudokuUI(root)
