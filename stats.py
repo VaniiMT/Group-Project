@@ -1,5 +1,5 @@
 import csv
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import tkinter as tk
 class StatsManager:
@@ -41,10 +41,14 @@ class StatsManager:
 
         # Crear ventana Tkinter
         root = tk.Toplevel()
-        root.title("Estadísticas de Intentos")
+        root.title("Estadísticas — Sudoku Solver")
+        root.geometry("1100x850")
+        root.minsize(800, 600)
 
-        # Crear subtramas
-        fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+        # Crear figura SIN pyplot: evitamos registrarla en el state global de
+        # pyplot, así no quedan figuras vivas tras cerrar la ventana.
+        fig = Figure(figsize=(10, 8))
+        axs = fig.subplots(2, 2)
 
         # Tiempo por intento
         axs[0, 0].plot(times, marker='o')
@@ -93,16 +97,27 @@ class StatsManager:
                           horizontalalignment='center', verticalalignment='center',
                           transform=axs[1, 1].transAxes)
         
-        plt.tight_layout()
+        fig.tight_layout()
 
         # Insertar el gráfico en la ventana Tkinter
         canvas = FigureCanvasTkAgg(fig, master=root)
         canvas.draw()
         canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-        
-        root.wait_window(root)
+        # Cierre limpio: liberar el canvas y la figura cuando se cierra la ventana
+        def _on_close():
+            try:
+                canvas.get_tk_widget().destroy()
+            except tk.TclError:
+                pass
+            root.destroy()
+
+        root.protocol("WM_DELETE_WINDOW", _on_close)
 
 
-stats = StatsManager()
-stats.show_graphs()
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.withdraw()
+    stats = StatsManager()
+    stats.show_graphs()
+    root.mainloop()

@@ -18,7 +18,9 @@ import copy
 # ========================================================
 
 def is_valid_board(board):
-    """ Comprueba si el tablero es válido (sin duplicados)."""
+    """ Comprueba si el tablero es válido (sin duplicados).
+    Devuelve siempre una tupla (bool, str): (True, "") si es válido,
+    o (False, mensaje) describiendo el primer conflicto encontrado."""
     #Comprobar que no hay duplicados en las filas
     for r in range(9):
         seen = set()                     #Conjunto para recordar números vistos
@@ -27,9 +29,9 @@ def is_valid_board(board):
             if v == 0:                   #Saltar celdas vacías
                 continue
             if v in seen:                #Si ya vimos este número en esta fila
-                return False
+                return False, f"Número {v} duplicado en la fila {r + 1}"
             seen.add(v)                  #Recordar este número
-    
+
     # Comprobar que no hay duplicados en las columnas
     for c in range(9):
         seen = set()
@@ -38,9 +40,9 @@ def is_valid_board(board):
             if v == 0:
                 continue
             if v in seen:
-                return False
+                return False, f"Número {v} duplicado en la columna {c + 1}"
             seen.add(v)
-    
+
     # Comprobar que no hay duplicados en los bloques 3x3
     for br in range(3):                  # br = bloque fila (0,1,2)
         for bc in range(3):              # bc = bloque columna (0,1,2)
@@ -52,9 +54,9 @@ def is_valid_board(board):
                     if v == 0:
                         continue
                     if v in seen:
-                        return False
+                        return False, f"Número {v} duplicado en el bloque 3x3 ({br + 1}, {bc + 1})"
                     seen.add(v)
-    
+
     return True, ""                     # Todo válido
 
 
@@ -132,48 +134,36 @@ def find_empty_mrv(board):
 
 
 # =============================================================
-# BACKTRACKING CLÁSICO
+# BACKTRACKING (clásico y MRV unificados)
 # ===============================================================
 
-def _solve_classic(board):
-    """
-    Resuelve con backtracking clásico (primera celda vacía, probar 1..9).
-    Modifica el tablero IN-PLACE. Devuelve True si encuentra solución.
-    """
-    cell = find_empty(board)             #Buscar primera celda vacía
-    if cell is None:                     #Si no hay celdas vacías
-        return True                      #Tablero resuelto
-    
-    row, col = cell
-    
-    for value in sorted(candidates(board, row, col)):  #Probar cada candidato en orden
-        board[row][col] = value          #Colocar el valor
-        if _solve_classic(board):        #Recursión, resolver el resto
-            return True                  #Si funciona, continuar
-        board[row][col] = 0              #Si no funcion, backtrack
-    
-    return False                         #Ningún candidato funcionó
+def _solve_recursive(board, find_cell):
+    """Backtracking parametrizado por la estrategia de selección de celda.
+    `find_cell` debe ser find_empty (clásico) o find_empty_mrv (MRV).
+    Modifica el tablero IN-PLACE. Devuelve True si encuentra solución."""
+    cell = find_cell(board)
+    if cell is None:                     # Sin celdas vacías -> resuelto
+        return True
 
-# =================================================================
-# BACKTRACKING MRV 
-# =========================================================
+    row, col = cell
+
+    for value in sorted(candidates(board, row, col)):
+        board[row][col] = value
+        if _solve_recursive(board, find_cell):
+            return True
+        board[row][col] = 0              # Backtrack
+
+    return False
+
+
+def _solve_classic(board):
+    """Backtracking clásico (primera celda vacía, probar 1..9)."""
+    return _solve_recursive(board, find_empty)
+
 
 def solve_mrv(board):
-    """Resuelve con backtracking MRV (celda con menos candidatos primero).
-    Modifica el tablero IN-PLACE. Devuelve True si encuentra solución. """
-    cell = find_empty_mrv(board)         #Buscar celda con menos candidatos
-    if cell is None:                     #Si no hay celdas vacías
-        return True                      #Tablero resuelto
-    
-    row, col = cell
-    
-    for value in sorted(candidates(board, row, col)):  #Probar cada candidato
-        board[row][col] = value          #Colocar el valor
-        if solve_mrv(board):            #Recursión
-            return True                  #Contunuar
-        board[row][col] = 0              #Backtrack
-    
-    return False                       
+    """Backtracking con heurística MRV (celda con menos candidatos primero)."""
+    return _solve_recursive(board, find_empty_mrv)
 
 # ===================================================================
 #Al hacer modificaciones debi implementar esta parte para que la UI pueda mostrar el proceso paso a paso.
@@ -226,50 +216,24 @@ def _search_iter(board, counters, find_cell):
     return False                         #Ningún candidato funcionó
 
 
-def _solve_classic_generator(board):
-    """
-    Generador para el modo clásico.
-    Emite Step incluyendo 'done' o 'fail' al final.
-    """
-    #Contadores: steps (intentos) y backtracks (retrocesos)
+def _solve_generator(board, find_cell):
+    """Generador parametrizado por la estrategia de selección de celda.
+    Emite Step incluyendo 'done' o 'fail' al final."""
     counters = {"steps": 0, "backtracks": 0}
-    
-    #Si ya está resuelto de entrada
+
     if is_solved(board):
         yield Step(0, 0, 0, "done", 0, 0)
         return
-    
-    #Ejecutar la búsqueda
-    solved = yield from _search_iter(board, counters, find_empty)
-    
-    #Emitir el evento final
-    if solved:
-        yield Step(0, 0, 0, "done", counters["steps"], counters["backtracks"])
-    else:
-        yield Step(0, 0, 0, "fail", counters["steps"], counters["backtracks"])
+
+    solved = yield from _search_iter(board, counters, find_cell)
+    final_action = "done" if solved else "fail"
+    yield Step(0, 0, 0, final_action, counters["steps"], counters["backtracks"])
 
 
-def _solve_mrv_generator(board):
-    """
-    Generador para el modo MRV.
-    Emite Step incluyendo 'done' o 'fail' al final.
-    """
-    #Contadores: steps (intentos) y backtracks (retrocesos)
-    counters = {"steps": 0, "backtracks": 0}
-    
-    #Si ya está resuelto de entrada
-    if is_solved(board):
-        yield Step(0, 0, 0, "done", 0, 0)
-        return
-    
-    #Ejecutar la búsqueda con selector MRV
-    solved = yield from _search_iter(board, counters, find_empty_mrv)
-    
-    #Emitir el evento final
-    if solved:
-        yield Step(0, 0, 0, "done", counters["steps"], counters["backtracks"])
-    else:
-        yield Step(0, 0, 0, "fail", counters["steps"], counters["backtracks"])
+_STRATEGIES = {
+    "classic": find_empty,
+    "mrv": find_empty_mrv,
+}
 
 
 #Exportar para UI
@@ -279,20 +243,12 @@ def solve_step_by_step(board, mode="classic"):
     mode: "classic" o "mrv"
     Devuelve un generador de Step objetos.
     """
-    #Validar el modo
-    if mode not in ("classic", "mrv"):
+    if mode not in _STRATEGIES:
         raise ValueError(f"Modo desconocido: {mode}")
-    
-    #Validar el tablero
+
     ok, msg = is_valid_board(board)
     if not ok:
         raise ValueError(msg)
-    
-    #Hacer una copia profunda para no modificar el original
+
     board_copy = copy.deepcopy(board)
-    
-    #Elegir el generador según el modo
-    if mode == "classic":
-        return _solve_classic_generator(board_copy)
-    else:
-        return _solve_mrv_generator(board_copy)
+    return _solve_generator(board_copy, _STRATEGIES[mode])
